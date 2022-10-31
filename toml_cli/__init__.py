@@ -1,10 +1,13 @@
+from nis import cat
 import pathlib
 from typing import Optional
 
+import sys
 import tomlkit
 import tomlkit.exceptions
 import typer
 import json
+from box import Box
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -15,10 +18,20 @@ def get(key: Optional[str] = typer.Argument(None), toml_path: pathlib.Path = typ
     toml_part = tomlkit.parse(toml_path.read_text())
 
     if key is not None:
-        for key_part in key.split("."):
-            toml_part = toml_part[key_part]
+        for key_part in key.split(".")[:-1]:
 
-    typer.echo(json.dumps(toml_part))
+            try:
+                if key_part.isnumeric():
+                    key_part = int(key_part)
+                toml_part = toml_part[key_part]
+            except KeyError:
+                typer.echo(f"Invalid toml Key {key}", err=True)
+                sys.exit(1)
+            except IndexError:
+                typer.echo(f"Invalid index toml Key {key}", err=True)
+                sys.exit(1)
+
+    typer.echo(toml_part)
 
 
 @app.command("set")
@@ -34,7 +47,10 @@ def set_(
     toml_part = toml_file = tomlkit.parse(toml_path.read_text())
 
     for key_part in key.split(".")[:-1]:
+
         try:
+            if key_part.isnumeric():
+                key_part = int(key_part)
             toml_part = toml_part[key_part]
         except tomlkit.exceptions.NonExistentKey:
             typer.echo(f"Key {key} can not set", err=True)
